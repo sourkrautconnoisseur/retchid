@@ -62,7 +62,61 @@ class retchid{
 		}
 		$this->DebugLine++;
 	}
-
+	
+	// Expects array of values to have keys that match column name in database
+	// ExecutionType 1 is for inserts, updates, deletes
+	// ExecutionType 2 is for grabbing information from database
+	protected function SimpleQueryBind($SQLQuery,$ValuesToPush,$ExecutionType){
+		if(!isset($ExecutionType) || $ExecutionType != 1 || $ExecutionType != 2){
+			$this->WriteDebugStream("Could not execute Query because ExecutionType not specificed or incorrect.");
+			return false;
+		}
+		$ParamaterValueKey = 0;
+		if(is_array($SQLQuery)){
+			foreach($SQLQuery as $QueryKey => $QueryString){
+				$this->NewMySQLConnection();
+				$PreparedSQLQuery->prepare($QueryString);
+				preg_match_all("~:VALUE~", $QueryString, $ParameterBindMatches);
+				preg_match_all('/([A-Z]+,)|(,+[A-Z])|([A-Z]+\\))/', $QueryString, $ParameterValueMatches);
+				$BindParameterIterations = count($ParameterBindMatches,COUNT_RECURSIVE);
+				foreach($ParameterValueMatches as $ColumnName){
+					$ColumnNames[] = substr($ColumnName,0,-1);
+				}
+				for($Bind = 1; $Bind < $BindParameterIterations; $Bind++){
+					$BindValue = $ColumnNames[$ParamaterValueKey];
+					$PreparedSQLQuery->bindParam(":VALUE$Bind", $ValuesToPush[$BindValue]);
+					$ParamaterValueKey++;
+				}
+				$PreparedSQLQuery->execute();
+				$Return = true;
+				if($ExecutionType != 1){
+				 	$Return = $PreparedSQLQuery->fetchAll();
+				}
+				$this->DestroyMySQLConnection();
+			}
+		}
+		elseif(is_string($SQLQuery)){
+			$this->NewMySQLConnection();
+			preg_match_all("~:VALUE~", $SQLQuery, $ParameterBindMatches);
+			preg_match_all('/([A-Z]+,)|(,+[A-Z])|([A-Z]+\\))/', $SQLQuery, $ParameterValueMatches);
+			$BindParameterIterations = count($ParameterBindMatches,COUNT_RECURSIVE);
+			foreach($ParameterValueMatches as $ColumnName){
+				$ColumnNames[] = substr($ColumnName,0,-1);
+			}
+			for($Bind = 1; $Bind < $BindParameterIterations; $Bind++){
+				$BindValue = $ColumnNames[$ParamaterValueKey];
+				$PreparedSQLQuery->bindParam(":VALUE$Bind", $ValuesToPush[$BindValue]);
+				$ParamaterValueKey++;
+			}
+			$PreparedSQLQuery->execute();
+			$Return = true;
+			if($ExecutionType != 1){
+				$Return = $PreparedSQLQuery->fetchAll();
+			}
+			$this->DestroyMySQLConnection();
+		}
+	return $Return;
+	}
 
 }
 
