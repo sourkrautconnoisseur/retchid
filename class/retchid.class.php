@@ -67,6 +67,8 @@ class retchid{
 	// If column name is Firstname, key for corresponding value must be "Firstname"
 	// This would work: array('Firstname' => 'James');
 	// These would not: array('james'), array(0 => 'James'), array("Something" => "James")
+	// Expects that your SQL query will bind to :VALUE[0-9]
+	// In future, will use preg_match to find what to bind to, for each query. (assuming we have same number of values to insert as we do parameters to bind).
 	// ExecutionType 1 is for inserts, updates, deletes
 	// ExecutionType 2 is for grabbing information from database
 	// Query can be string or array
