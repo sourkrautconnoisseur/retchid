@@ -75,7 +75,7 @@ class retchid{
 		if(is_array($SQLQuery)){
 			foreach($SQLQuery as $QueryKey => $QueryString){
 				$this->NewMySQLConnection();
-				$PreparedSQLQuery->prepare($QueryString);
+				$PreparedSQLQuery = $this->MySQLConnection->prepare($QueryString);
 				preg_match_all("~:VALUE~", $QueryString, $ParameterBindMatches);
 				preg_match_all('/([A-Z]+,)|(,+[A-Z])|([A-Z]+\\))/', $QueryString, $ParameterValueMatches);
 				$BindParameterIterations = count($ParameterBindMatches,COUNT_RECURSIVE);
@@ -97,6 +97,7 @@ class retchid{
 		}
 		elseif(is_string($SQLQuery)){
 			$this->NewMySQLConnection();
+			$PreparedSQLQuery = $this->MySQLConnection->prepare($SQLQuery);
 			preg_match_all("~:VALUE~", $SQLQuery, $ParameterBindMatches);
 			preg_match_all('/([A-Z]+,)|(,+[A-Z])|([A-Z]+\\))/', $SQLQuery, $ParameterValueMatches);
 			$BindParameterIterations = count($ParameterBindMatches,COUNT_RECURSIVE);
