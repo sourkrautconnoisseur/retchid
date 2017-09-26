@@ -64,8 +64,13 @@ class retchid{
 	}
 	
 	// Expects array of values to have keys that match column name in database
+	// If column name is Firstname, key for corresponding value must be "Firstname"
+	// This would work: array('Firstname' => 'James');
+	// These would not: array('james'), array(0 => 'James'), array("Something" => "James")
 	// ExecutionType 1 is for inserts, updates, deletes
 	// ExecutionType 2 is for grabbing information from database
+	// Query can be string or array
+
 	protected function SimpleQueryBind($SQLQuery,$ValuesToPush,$ExecutionType){
 		if(!isset($ExecutionType) || $ExecutionType != 1 || $ExecutionType != 2){
 			$this->WriteDebugStream("Could not execute Query because ExecutionType not specificed or incorrect.");
