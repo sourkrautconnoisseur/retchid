@@ -206,10 +206,10 @@ class Retchid{
 		if($blobLength == 100 || $blobLength > 100){
 			$blobString = implode("",$blobArray[0]);
 			$fixedLength = str_split($blobString,100);
-			if($this->CheckUserExistence($fixedLength)){
+			if($this->CheckUserExistence($fixedLength[0])){
 				$this->generateUserID();
 			}
-			return $fixedLength;
+			return $fixedLength[0];
 		}
 	}
 
@@ -236,6 +236,46 @@ class Retchid{
 		}
 		return false;
 	}
+	
+	public function CreateNewUser($UserCreationArray){
+		if($this->CheckUserExistence((string)$UserCreationArray["EMAIL"])){
+			// user already exists with said email, will also be done with jscript on frontend.
+			return false;
+		}elseif($this->CheckUserExistence((string)$UserCreationArray["USERNAME"])){
+			// user already exists with said username, will also be done with jscript on frontend
+			return false;
+		}
+		$UserCreationQueries = array(
+			"Users" => "INSERT INTO Users (USERNAME,EMAIL,PASSWORD,SALT,UNIQUEID) VALUES (:UC1,:UC2,:UC3,:UC4,:UC5)",
+			"UserInformation" => "INSERT INTO UserInformation (FIRST,LAST,DOB,GENDER,UNIQUEID) VALUES (:UC1,:UC2,:UC3,:UC4,:UC5)"
+			);
+		$UsersSecurityInformation = $this->ConvertPassword($UserCreationArray["PASSWORD"],"");
+		$UserID = $this->generateUserID();
+		$PassThroughArray = array(
+				0 => array(
+				"USERNAME" => $UserCreationArray["USERNAME"],
+				"EMAIL" => $UserCreationArray["EMAIL"],
+				"PASSWORD" => $UsersSecurityInformation[1],
+				"SALT" => $UsersSecurityInformation[0],
+				"UNIQUEID" => $UserID
+				),
+				1 => array(
+					"FIRST" => $UserCreationArray["FIRSTNAME"],
+					"LAST" => $UserCreationArray["LASTNAME"],
+					"DOB" => $UserCreationArray["DOB"],
+					"GENDER" => $UserCreationArray["GENDER"],
+					"UNIQUEID" => $UserID
+				)
+			);
+		$ExecuteCreation = $this->RecurseSQL($UserCreationQueries,$PassThroughArray);
+		if(isset($ExecuteCreation[0])){
+			//user created....
+			return true;
+		}
+		//user not created.... probably a server error or something
+		return false;
+	}
+
 	// User Information Modification Methods
 
 
