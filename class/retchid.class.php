@@ -219,7 +219,29 @@ class Retchid{
 			return $fixedLength;
 		}
 	}
-
+	
+	private function CheckUserExistence($UserValidation){
+		if(preg_match('/[0-9]+/', $UserValidation)){
+			$Method = "UNIQUEID";
+		}elseif(preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/', $UserValidation)){
+			$Method = "EMAIL";
+		}else{
+			$Method = "USERNAME";
+		}
+		$SQLQueryArray = array(
+			0 => "SELECT * FROM Users WHERE ($Method) = (:USERVALIDATION)"
+			);
+		$SQLQueryValues = array(
+			array( $Method => $UserValidation)
+			);
+		$SQLOperationResults = $this->RecurseSQL($SQLQueryArray,$SQLQueryValues);
+		if(isset($SQLOperationResults[0])){
+			//user exists
+			$this->OpenDebugStream("This user does in fact, exist.");
+			return true;
+		}
+		return false;
+	}
 	// User Information Modification Methods
 
 
