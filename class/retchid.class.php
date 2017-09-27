@@ -206,19 +206,13 @@ class Retchid{
 		if($blobLength == 100 || $blobLength > 100){
 			$blobString = implode("",$blobArray[0]);
 			$fixedLength = str_split($blobString,100);
-			$SQLQueryArray = array(
-				0 => "SELECT * FROM Users WHERE (UNIQUEID) = (:UID1)"
-				);
-			$SQLQueryValues = array(
-				array( "UNIQUEID" => $fixedLength )
-				);
-			$SQLOperationResults = $this->RecurseSQL($SQLQueryArray, $SQLQueryValues);
-			if($SQLOperationResults[0]["ROWCOUNT"] > 0){
+			if($this->CheckUserExistence($fixedLength)){
 				$this->generateUserID();
 			}
 			return $fixedLength;
 		}
 	}
+
 	
 	private function CheckUserExistence($UserValidation){
 		if(preg_match('/[0-9]+/', $UserValidation)){
