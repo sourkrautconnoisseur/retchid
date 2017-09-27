@@ -66,6 +66,7 @@ class Retchid{
 		$DSN = "mysql:host=". SQL_CONNECTION_ARRAY['HOST'] .";dbname=" . SQL_CONNECTION_ARRAY['DATABASE'];
 		try{
 			$this->DatabaseConnection = new PDO($DSN,SQL_CONNECTION_ARRAY['USERNAME'],SQL_CONNECTION_ARRAY['PASSWORD']);
+			$this->DatabaseConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 			$this->OpenDebugStream('Connected to: ' . SQL_CONNECTION_ARRAY['DATABASE'] . " on " . SQL_CONNECTION_ARRAY['HOST'] . "\n");
 			return $this->DatabaseConnection;
 		}catch(PDOException $MySQLError){
@@ -111,15 +112,14 @@ class Retchid{
 				}elseif(preg_match('~(SELECT)|(DELETE)~',$QueryString)){
 					$ExecutionType = 2;
 				}
-				preg_match_all('~([[:alpha:]]+,)|([[:alpha:]]+\))~', $QueryString, $Columns);
-				$CorrectedColumns = preg_replace('/,|\)/', '', $Columns[0]);
 				preg_match_all('~:[[:alnum:]]+~', $QueryString, $Parameters);
+				print_r($Parameters);
 				try{
 					$PreparedQuery = $this->DatabaseConnection->prepare($QueryString);
-					$ColumnNumber = 0;
 					foreach($Parameters[0] as $BindMe){
-						$PreparedQuery->bindParam($BindMe,$SQLValues[$ValueKey][$CorrectedColumns[$ColumnNumber]]);
-						$ColumnNumber++;
+						foreach($SQLValues[$ValueKey] as $Key => $Data ){
+							$PreparedQuery->bindParam($BindMe,$SQLValues[$ValueKey][$Key]);
+						}
 					}
 					$PreparedQuery->execute();
 					$Return[$ValueKey]["ROWCOUNT"] = $PreparedQuery->rowCount();
@@ -131,8 +131,10 @@ class Retchid{
 					$this->OpenDebugStream($SQLOperationError);
 					return false;
 				}
-				$this->CloseDatabaseConnection();
-				$ValueKey++;
+				// $this->CloseDatabaseConnection();
+				// if(count($SQLValues)>1){
+					$ValueKey++;
+				// }
 			}
 			return $Return;
 		}
@@ -155,8 +157,10 @@ class Retchid{
 			);
 	}
 
+
+	// for some reason, will not update incorrect login time based of unique id
 	public function CheckPassword ( $PlainTextPassword, $Username ){
-		if(preg_match('/(@[[:alnum:]]+.[[:alpha:]]+)/',$Username)){
+		if(preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/',$Username)){
 			$Method = "EMAIL";
 		}else{ $Method = "USERNAME"; }
 		$SQLQueryArray =  array(
@@ -167,11 +171,26 @@ class Retchid{
 			);
 		$SQLOperationResults = $this->RecurseSQL($SQLQueryArray,$SQLValueArray);
 		$PasswordResults = $this->ConvertPassword($PlainTextPassword,$SQLOperationResults[0]["RESULTS"]["SALT"]);
+		print_r($SQLOperationResults);
+		$LastIncorrectLoginTime = strtotime($SQLOperationResults[0]["RESULTS"]["LASTINLOGTIME"]);
+		$CurrentTime = strtotime(date("Y-m-d H:i:s"));
+		$TimeDifference = round(abs($CurrentTime - $LastIncorrectLoginTime) / 60,0);
+		print($TimeDifference);
+		$IncorrectLoginAttempts = $SQLOperationResults[0]["RESULTS"]["INLOGCOUNT"];
 		if($PasswordResults[1] === $SQLOperationResults[0]["RESULTS"]["PASSWORD"]){
-			print("Passwords match\n");
-			return false;
+			if($IncorrectLoginAttempts > 5 && $TimeDifference < 30){
+				$this->OpenDebugStream("User account disabled for 30 minutes (5 consecutive incorrect logins).");
+				return false;
+			}
+			//reset login counter and last incorrect login time
+			return true;
 		}else{
-			print("Passwords do not match\n");
+			$UserUniqueID = $SQLOperationResults[0]["RESULTS"]["UNIQUEID"];
+			$UpdateIncorrectLoginCountQuery = 'UPDATE Users SET INLOGCOUNT = INLOGCOUNT + 1 WHERE (UNIQUEID) = (:USERID)';
+			$UpdateIncorrectLoginCountValues = array(
+					array("UNIQUEID" => (string)$UserUniqueID)
+				);
+			$this->RecurseSQL($UpdateIncorrectLoginCountQuery, $UpdateIncorrectLoginCountValues);
 			return false;
 		}
 	}
@@ -203,9 +222,14 @@ class Retchid{
 
 	// User Information Modification Methods
 
-	
+
 
 
 
 
 }
+
+
+
+
+?>
