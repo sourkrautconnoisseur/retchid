@@ -1,5 +1,41 @@
 <?php
 
+    /**
+    *
+    * Core retchid class that handles all main functions of the framework.
+    *
+    *
+    * @category   Retchid
+    * @package    RetchidFramework
+    * @copyright  Copyright (c) 2017 Scorched Wire Media Group
+    * @license    https://www.apache.org/licenses/LICENSE-2.0   Apache 2.0 License
+    * @version    Release: @package_version@
+    * @link       https://github.com/sourkrautconnoisseur/retchid
+    * @since      Class and file available since Release 0.1
+    *
+    */
+
+	/*
+	*
+	* todo:
+	* 1. Rewrite IterateSQL() to detect when a single value will be used to bind to various parameters in various queries.
+	* 2. Turn erroneous if()elseif()else() into ternary operators (keep commented now, try not to break working things)
+	* 3. Define Default Private Policies, and update createNewUsers to reflect.
+	* 4. Define Remote User Information to be used for debugging, code-tracking, etc.
+	* 5. Design User Relationships Hierarchy and Mesh
+	* 6. Develop Upvote, Downvote, View Systems and Rating Systems.
+	* 7. Implement Captcha and ReCaptcha
+	* 8. Create SEO for hybrid pages (static but dynamic)
+	* 9. Create File Management System
+	* 10. Create Internal Messaging System
+	* 11. Create Posting System
+	* 12. Implement PGP and GPG keys into Messaging System
+	* 13. Implement PKI for internal messaging system
+	* 14. One Time Login Mechanisms (Two-Factor + Recovery)
+	* 15. Database Maintenance Mechanisms and Optimization Mechanisms as well as post content screening system
+	*
+	*/
+
 require_once("../include/Constants.php");
 class Retchid{
 
@@ -11,10 +47,20 @@ class Retchid{
 	private $SQLLastConnectionError = null;
 	public $DatabaseConnection = null;
 
+	private $CurrentTime = null;
+	private $RemoteAddress = null;
+
 	public function __construct(){
 		foreach(get_included_files() as $IncludedFile){
 			if(preg_match('~Constants.php~', $IncludedFile)){
 				$ConstantsLoaded = true;
+				$this->CurrentTime = date("Y-m-d H:i:s");
+				$this->RemoteAddress = getenv('HTTP_CLIENT_IP')?:
+				getenv('HTTP_X_FORWARDED_FOR')?:
+				getenv('HTTP_X_FORWARDED')?:
+				getenv('HTTP_FORWARDED_FOR')?:
+				getenv('HTTP_FORWARDED')?:
+				getenv('REMOTE_ADDR');
 			}
 		}
 		if(!isset($ConstantsLoaded)){
@@ -22,8 +68,23 @@ class Retchid{
 		}
 	}
 
-
-	// Error Handling
+	private function StackTrace($DebugInformation){
+		if(is_array($DebugInformation)){
+			$this->OpenDatabaseConnection();
+			$StackTraceQueryArray = array(
+				0 => "INSERT INTO DebugInformation (TITLE,DESCRIPTION,ERCODE,CLIENT,ERID) VALUES (:TITLE1,:DESC1,:ERCODE1,:CLIENT1,:ERID"
+				);
+			$StackTrackValueArray = array(
+				"TITLE" => $DebugInformation["TITLE"],
+				"DESCRIPTION" => $DebugInformation["DESCRIPTION"],
+				"ERCODE" => $DebugInformation["ERCODE"],
+				"CLIENT" => $this->RemoteAddress
+				);
+			$this->IterateSQL($StackTraceQueryArray, $StackTrackValueArray);
+			return true;
+		}
+		return fasle;
+	}
 
 	private function LogDebugHistory($DebugInformation){
 		if(count($this->DebugHistory) <= 50){
@@ -52,7 +113,6 @@ class Retchid{
 		$this->DebugLine++;
 		return true;
 	}
-
 
 	// Database Connection Handling
 
@@ -92,10 +152,9 @@ class Retchid{
 
 	}
 
-
-	public function RecurseSQL($SQLQuery,$SQLValues){
+	public function IterateSQL($SQLQuery,$SQLValues){
 		if(!is_array($SQLValues)){
-			$this->OpenDebugStream("Could not perform RecureSQL(), SQLValues must be array.");
+			$this->OpenDebugStream("Could not perform IterateSQL(), SQLValues must be array.");
 			return false;
 		}else{
 			$SQLQueries = $SQLQuery;
@@ -107,45 +166,52 @@ class Retchid{
 			$ValueKey = 0;
 			foreach($SQLQueries as $QueryKey => $QueryString){
 				$this->OpenDatabaseConnection();
-				if(preg_match('~(INSERT)|(REPLACE)|(UPDATE)~',$QueryString)){
-					$ExecutionType = 1;
-				}elseif(preg_match('~(SELECT)|(DELETE)~',$QueryString)){
-					$ExecutionType = 2;
-				}
+							
+				$ExecutionType = preg_match('~(INSERT)|(REPLACE)|(UPDATE)~', $QueryString)?1:
+								 preg_match('~(SELECT)|(DELETE)~', $QueryString)?2;
+				
+				/*switch (preg_match('~(INSERT)|(REPLACE)|(UPDATE)~', $QueryString)) {
+					case true:
+						$ExecutionType = 1;
+						break;
+					
+					default:
+						$ExecutionType = 2;
+						break;
+				}*/
+				preg_match_all('/([[:alpha:]]+,)|([[:alpha:]]+\))/',$QueryString,$ColName);
+				$CorrectedColumnNames = preg_replace('/,|\)/', '', $ColName[0]);
 				preg_match_all('~:[[:alnum:]]+~', $QueryString, $Parameters);
-				print_r($Parameters);
 				try{
 					$PreparedQuery = $this->DatabaseConnection->prepare($QueryString);
-					foreach($Parameters[0] as $BindMe){
-						foreach($SQLValues[$ValueKey] as $Key => $Data ){
-							$PreparedQuery->bindParam($BindMe,$SQLValues[$ValueKey][$Key]);
-						}
+					for($Integer = 0; $Integer < count($Parameters[0]); $Integer++){
+						$PreparedQuery->bindParam($Parameters[0][$Integer],$SQLValues[$ValueKey][$CorrectedColumnNames[$Integer]]);
 					}
 					$PreparedQuery->execute();
 					$Return[$ValueKey]["ROWCOUNT"] = $PreparedQuery->rowCount();
 					if($ExecutionType == 2){
 						$OperationResults = $PreparedQuery->fetchAll(PDO::FETCH_ASSOC);
-						$Return[$ValueKey]["RESULTS"] = $OperationResults[0];
+						if(isset($OperationResults[0])){
+							$Return[$ValueKey]["RESULTS"] = $OperationResults[0];
+						}
 					}
 				}catch(Exception $SQLOperationError){
 					$this->OpenDebugStream($SQLOperationError);
 					return false;
 				}
-				// $this->CloseDatabaseConnection();
-				// if(count($SQLValues)>1){
+				// $ValueKey = count($SQLValues)>1?$ValueKey++;
+				if(count($SQLValues > 1)){
 					$ValueKey++;
-				// }
+				}
 			}
 			return $Return;
 		}
 	}
 
-
-
 	// Password Related Methods.
 
 	public function ConvertPassword($PlainTextPassword, $Salt){
-		if(empty($Salt)){
+		if(empty($Salt) || $Salt == ""){
 			$costStrength = 10;
 			$generatedSalt = strtr(base64_encode(mcrypt_create_iv(16, MCRYPT_DEV_URANDOM)), '+', '.');
 			$Salt = sprintf("$2a$%02d$",$costStrength) . $generatedSalt;
@@ -157,19 +223,17 @@ class Retchid{
 			);
 	}
 
-
-	// for some reason, will not update incorrect login time based of unique id
 	public function CheckPassword ( $PlainTextPassword, $Username ){
 		if(preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/',$Username)){
 			$Method = "EMAIL";
 		}else{ $Method = "USERNAME"; }
 		$SQLQueryArray =  array(
-			0 => "SELECT * FROM Users WHERE ($Method) = (:$Method" . "1)"
+			0 => "SELECT * FROM Users WHERE ($Method) = (:VALUE1)"
 			);
 		$SQLValueArray = array(
 			array( $Method => $Username )
 			);
-		$SQLOperationResults = $this->RecurseSQL($SQLQueryArray,$SQLValueArray);
+		$SQLOperationResults = $this->IterateSQL($SQLQueryArray,$SQLValueArray);
 		$PasswordResults = $this->ConvertPassword($PlainTextPassword,$SQLOperationResults[0]["RESULTS"]["SALT"]);
 		print_r($SQLOperationResults);
 		$LastIncorrectLoginTime = strtotime($SQLOperationResults[0]["RESULTS"]["LASTINLOGTIME"]);
@@ -190,13 +254,13 @@ class Retchid{
 			$UpdateIncorrectLoginCountValues = array(
 					array("UNIQUEID" => (string)$UserUniqueID)
 				);
-			$this->RecurseSQL($UpdateIncorrectLoginCountQuery, $UpdateIncorrectLoginCountValues);
+			$this->IterateSQL($UpdateIncorrectLoginCountQuery, $UpdateIncorrectLoginCountValues);
 			return false;
 		}
 	}
 
 
-	// User Creation Methods 
+	// User Creation and Deletion Methods 
 
 	private function generateUserID(){
 		$binaryBlob = openssl_random_pseudo_bytes(99);
@@ -213,7 +277,6 @@ class Retchid{
 		}
 	}
 
-	
 	private function CheckUserExistence($UserValidation){
 		if(preg_match('/[0-9]+/', $UserValidation)){
 			$Method = "UNIQUEID";
@@ -228,21 +291,18 @@ class Retchid{
 		$SQLQueryValues = array(
 			array( $Method => $UserValidation)
 			);
-		$SQLOperationResults = $this->RecurseSQL($SQLQueryArray,$SQLQueryValues);
-		if(isset($SQLOperationResults[0])){
-			//user exists
+		$SQLOperationResults = $this->IterateSQL($SQLQueryArray,$SQLQueryValues);
+		if(isset($SQLOperationResults[0]) &&  $SQLOperationResults[0]["ROWCOUNT"] > 0){
 			$this->OpenDebugStream("This user does in fact, exist.");
 			return true;
 		}
 		return false;
 	}
-	
+
 	public function CreateNewUser($UserCreationArray){
 		if($this->CheckUserExistence((string)$UserCreationArray["EMAIL"])){
-			// user already exists with said email, will also be done with jscript on frontend.
 			return false;
 		}elseif($this->CheckUserExistence((string)$UserCreationArray["USERNAME"])){
-			// user already exists with said username, will also be done with jscript on frontend
 			return false;
 		}
 		$UserCreationQueries = array(
@@ -267,17 +327,55 @@ class Retchid{
 					"UNIQUEID" => $UserID
 				)
 			);
-		$ExecuteCreation = $this->RecurseSQL($UserCreationQueries,$PassThroughArray);
+		$ExecuteCreation = $this->IterateSQL($UserCreationQueries,$PassThroughArray);
 		if(isset($ExecuteCreation[0])){
-			//user created....
 			return true;
 		}
-		//user not created.... probably a server error or something
 		return false;
+
+		// Use session and cookies to pass username, use unique ID.
+		public function PermanentlyDeleteUser($Username,$PlainTextPassword){
+			if($this->CheckPassword($PlainTextPassword,$Username)){
+					$DeleteQuery = array(
+						0 => "DELETE FROM Users WHERE (UNIQUEID) = :UNIQUEID1",
+						1 => "DELETE FROM UsersInformation WHERE (UNIQUEID) = :UNIQUEID1"
+						);
+					$DeleteValues = array(
+						array("UNIQUEID" => $Username),
+						array("UNIQUEID" => $Username)
+						);
+			}else{
+				// username and password don't match
+				return false;
+			}
+		}
 	}
 
 	// User Information Modification Methods
 
+	// User Informtion Grabbing Methods
+
+	// User Profile Information 
+
+	// Friends and Relationship Management Methods
+
+	// Posts and Post Comments Methods
+
+	// Sorting Algorithms 
+
+	// File Management Methods
+
+	// Bot Detection Mechanisms
+
+	// Search Engine Optimization for Dy-Static Pages
+
+	// Message System
+
+	// GPG and PGP Extension for Message System
+
+	// Message and Post PKI Extension..........let's see how this goes.
+
+	// One-Time Login Extension (SMS and Email Codes)
 
 
 
@@ -285,6 +383,7 @@ class Retchid{
 
 }
 
+$Object = new Retchid;
 
 
 
