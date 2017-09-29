@@ -114,7 +114,8 @@ class Retchid{
 		return true;
 	}
 
-	// Database Connection Handling
+	/*
+	*/
 
 	public function OpenDatabaseConnection(){
 		foreach (SQL_CONNECTION_ARRAY as $KeyName => $Data){
@@ -137,6 +138,9 @@ class Retchid{
 
 	}
 
+	/*
+	*/
+
 	public function CloseDatabaseConnection(){
 		$listQuery = 'SHOW PROCESSLIST -- ' . uniqid( 'pdo_mysql_close ', 1);
 	   	$threadList  = $this->DatabaseConnection->query( $listQuery )->fetchAll( PDO::FETCH_ASSOC );
@@ -152,6 +156,10 @@ class Retchid{
 
 	}
 
+
+	/*
+	*/
+
 	public function IterateSQL($SQLQuery,$SQLValues){
 		if(!is_array($SQLValues)){
 			$this->OpenDebugStream("Could not perform IterateSQL(), SQLValues must be array.");
@@ -166,19 +174,8 @@ class Retchid{
 			$ValueKey = 0;
 			foreach($SQLQueries as $QueryKey => $QueryString){
 				$this->OpenDatabaseConnection();
-							
 				$ExecutionType = preg_match('~(INSERT)|(REPLACE)|(UPDATE)~', $QueryString)?1:
 								 preg_match('~(SELECT)|(DELETE)~', $QueryString)?2;
-				
-				/*switch (preg_match('~(INSERT)|(REPLACE)|(UPDATE)~', $QueryString)) {
-					case true:
-						$ExecutionType = 1;
-						break;
-					
-					default:
-						$ExecutionType = 2;
-						break;
-				}*/
 				preg_match_all('/([[:alpha:]]+,)|([[:alpha:]]+\))/',$QueryString,$ColName);
 				$CorrectedColumnNames = preg_replace('/,|\)/', '', $ColName[0]);
 				preg_match_all('~:[[:alnum:]]+~', $QueryString, $Parameters);
@@ -199,7 +196,6 @@ class Retchid{
 					$this->OpenDebugStream($SQLOperationError);
 					return false;
 				}
-				// $ValueKey = count($SQLValues)>1?$ValueKey++;
 				if(count($SQLValues > 1)){
 					$ValueKey++;
 				}
