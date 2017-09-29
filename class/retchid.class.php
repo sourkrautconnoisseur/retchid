@@ -220,9 +220,7 @@ class Retchid{
 	}
 
 	public function CheckPassword ( $PlainTextPassword, $Username ){
-		if(preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/',$Username)){
-			$Method = "EMAIL";
-		}else{ $Method = "USERNAME"; }
+		$Method = (preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/',$Username)?"EMAIL":"USERNAME");
 		$SQLQueryArray =  array(
 			0 => "SELECT * FROM Users WHERE ($Method) = (:VALUE1)"
 			);
@@ -274,13 +272,7 @@ class Retchid{
 	}
 
 	private function CheckUserExistence($UserValidation){
-		if(preg_match('/[0-9]+/', $UserValidation)){
-			$Method = "UNIQUEID";
-		}elseif(preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/', $UserValidation)){
-			$Method = "EMAIL";
-		}else{
-			$Method = "USERNAME";
-		}
+		$Method = (preg_match('/[0-9]+/', $UserValidation)?"UNIQUEID":preg_match('/(@[[:alnum:]]+.+[[:alpha:]]+)/', $UserValidation)?"EMAIL":"USERNAME");
 		$SQLQueryArray = array(
 			0 => "SELECT * FROM Users WHERE ($Method) = (:USERVALIDATION)"
 			);
@@ -296,11 +288,9 @@ class Retchid{
 	}
 
 	public function CreateNewUser($UserCreationArray){
-		if($this->CheckUserExistence((string)$UserCreationArray["EMAIL"])){
-			return false;
-		}elseif($this->CheckUserExistence((string)$UserCreationArray["USERNAME"])){
-			return false;
-		}
+		($this->CheckUserExistence((string)$UserCreationArray["EMAIL"])?return false):
+		$this->CheckUserExistence((string)$UserCreationArray["USERNAME"]?return false));
+
 		$UserCreationQueries = array(
 			"Users" => "INSERT INTO Users (USERNAME,EMAIL,PASSWORD,SALT,UNIQUEID) VALUES (:UC1,:UC2,:UC3,:UC4,:UC5)",
 			"UserInformation" => "INSERT INTO UserInformation (FIRST,LAST,DOB,GENDER,UNIQUEID) VALUES (:UC1,:UC2,:UC3,:UC4,:UC5)"
@@ -330,21 +320,22 @@ class Retchid{
 		return false;
 
 		// Use session and cookies to pass username, use unique ID.
-		public function PermanentlyDeleteUser($Username,$PlainTextPassword){
-			if($this->CheckPassword($PlainTextPassword,$Username)){
-					$DeleteQuery = array(
-						0 => "DELETE FROM Users WHERE (UNIQUEID) = :UNIQUEID1",
-						1 => "DELETE FROM UsersInformation WHERE (UNIQUEID) = :UNIQUEID1"
-						);
-					$DeleteValues = array(
-						array("UNIQUEID" => $Username),
-						array("UNIQUEID" => $Username)
-						);
-			}else{
-				// username and password don't match
-				return false;
-			}
-		}
+		/*		public function PermanentlyDeleteUser($Username,$PlainTextPassword){
+					if($this->CheckPassword($PlainTextPassword,$Username)){
+							$DeleteQuery = array(
+								0 => "DELETE FROM Users WHERE (UNIQUEID) = :UNIQUEID1",
+								1 => "DELETE FROM UsersInformation WHERE (UNIQUEID) = :UNIQUEID1"
+								);
+							$DeleteValues = array(
+								array("UNIQUEID" => $Username),
+								array("UNIQUEID" => $Username)
+								);
+					}else{
+						// username and password don't match
+						return false;
+					}
+				}
+		*/
 	}
 
 	// User Information Modification Methods
